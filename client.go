@@ -33,16 +33,17 @@ const (
 
 // ClientConfig is a bag of config parameters for Client.
 type ClientConfig struct {
-	STUNServerAddr string // STUN server address (e.g. "stun.abc.com:3478")
-	TURNServerAddr string // TURN server addrees (e.g. "turn.abc.com:3478")
-	Username       string
-	Password       string
-	Realm          string
-	Software       string
-	RTO            time.Duration
-	Conn           net.PacketConn // Listening socket (net.PacketConn)
-	LoggerFactory  logging.LoggerFactory
-	Net            *vnet.Net
+	STUNServerAddr    string // STUN server address (e.g. "stun.abc.com:3478")
+	TURNServerAddr    string // TURN server addrees (e.g. "turn.abc.com:3478")
+	Username          string
+	Password          string
+	Realm             string
+	Software          string
+	RTO               time.Duration
+	Conn              net.PacketConn // Listening socket (net.PacketConn)
+	LoggerFactory     logging.LoggerFactory
+	Net               *vnet.Net
+	TransportProtocol proto.Protocol
 }
 
 // Client is a STUN server client
@@ -86,7 +87,12 @@ func NewClient(config *ClientConfig) (*Client, error) {
 	var err error
 	if len(config.STUNServerAddr) > 0 {
 		log.Debugf("resolving %s", config.STUNServerAddr)
-		stunServ, err = config.Net.ResolveUDPAddr("udp4", config.STUNServerAddr)
+		if config.TransportProtocol == proto.ProtoUDP {
+			stunServ, err = config.Net.ResolveUDPAddr("udp4", config.STUNServerAddr)
+		} else {
+			stunServ, err = net.ResolveTCPAddr("tcp4", config.STUNServerAddr)
+		}
+
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +101,7 @@ func NewClient(config *ClientConfig) (*Client, error) {
 	}
 	if len(config.TURNServerAddr) > 0 {
 		log.Debugf("resolving %s", config.TURNServerAddr)
-		turnServ, err = config.Net.ResolveUDPAddr("udp4", config.TURNServerAddr)
+		turnServ, err = net.ResolveTCPAddr("tcp4", config.TURNServerAddr) // todo - resolve TCP
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +217,7 @@ func (c *Client) SendBindingRequestTo(to net.Addr) (net.Addr, error) {
 	}
 
 	//return fmt.Sprintf("pkt_size=%d src_addr=%s refl_addr=%s:%d", size, addr, reflAddr.IP, reflAddr.Port), nil
-	return &net.UDPAddr{
+	return &net.TCPAddr{
 		IP:   reflAddr.IP,
 		Port: reflAddr.Port,
 	}, nil
@@ -240,7 +246,7 @@ func (c *Client) Allocate() (net.PacketConn, error) {
 	msg, err := stun.Build(
 		stun.TransactionID,
 		stun.NewType(stun.MethodAllocate, stun.ClassRequest),
-		proto.RequestedTransport{Protocol: proto.ProtoUDP},
+		proto.RequestedTransport{Protocol: proto.ProtoTCP},
 		stun.Fingerprint,
 	)
 	if err != nil {
@@ -270,7 +276,7 @@ func (c *Client) Allocate() (net.PacketConn, error) {
 	msg, err = stun.Build(
 		stun.TransactionID,
 		stun.NewType(stun.MethodAllocate, stun.ClassRequest),
-		proto.RequestedTransport{Protocol: proto.ProtoUDP},
+		proto.RequestedTransport{Protocol: proto.ProtoTCP},
 		&c.username,
 		&c.realm,
 		&nonce,
@@ -428,7 +434,7 @@ func (c *Client) handleSTUNMessage(data []byte, from net.Addr) error {
 			if err := peerAddr.GetFrom(msg); err != nil {
 				return err
 			}
-			from = &net.UDPAddr{
+			from = &net.TCPAddr{
 				IP:   peerAddr.IP,
 				Port: peerAddr.Port,
 			}
