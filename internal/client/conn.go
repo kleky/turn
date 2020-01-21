@@ -157,10 +157,10 @@ func (c *UDPConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 // see SetDeadline and SetWriteDeadline.
 // On packet-oriented connections, write timeouts are rare.
 func (c *UDPConn) WriteTo(p []byte, addr net.Addr) (int, error) {
-	_, ok := addr.(*net.UDPAddr)
+	/*_, ok := addr.(*net.TCPAddr)
 	if !ok {
 		return 0, fmt.Errorf("addr is not a net.UDPAddr")
-	}
+	}*/
 
 	// check if we have a permission for the destination IP addr
 	perm, ok := c.permMap.find(addr)

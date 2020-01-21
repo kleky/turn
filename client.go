@@ -306,7 +306,7 @@ func (c *Client) Allocate() (net.PacketConn, error) {
 	if err := relayed.GetFrom(res); err != nil {
 		return nil, err
 	}
-	relayedAddr := &net.UDPAddr{
+	relayedAddr := &net.TCPAddr{
 		IP:   relayed.IP,
 		Port: relayed.Port,
 	}
